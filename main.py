@@ -8,21 +8,21 @@ app = FastAPI()
 
 LOG_FILE = "apache_logs"
 STATE_FILE = "log_state.json"
-BATCH_SIZE = 10
+BATCH_SIZE = 100
 
 
-LOG_PATTERN = re.compile(
-    r'(?P<ipaddress>\S+) \S+ \S+ \[(?P<timestamp>.*?)\] '
-    r'"(?P<method>\S+) (?P<path>\S+) (?P<protocol>[^"]+)" '
-    r'(?P<status_code>\d{3}) (?P<bytes_sent>\S+) '
-    r'"(?P<referrer>[^"]*)" "(?P<user_agent>[^"]*)"'
-)
+# LOG_PATTERN = re.compile(
+#     r'(?P<ipaddress>\S+) \S+ \S+ \[(?P<timestamp>.*?)\] '
+#     r'"(?P<method>\S+) (?P<path>\S+) (?P<protocol>[^"]+)" '
+#     r'(?P<status_code>\d{3}) (?P<bytes_sent>\S+) '
+#     r'"(?P<referrer>[^"]*)" "(?P<user_agent>[^"]*)"'
+# )
 
-def parse_log_line(line):
-    match = LOG_PATTERN.match(line)
-    if match:
-        return match.groupdict()
-    return None
+# def parse_log_line(line):
+#     match = LOG_PATTERN.match(line)
+#     if match:
+#         return match.groupdict()
+#     return None
 
 
 def get_last_index():
@@ -35,20 +35,30 @@ def update_last_index(idx):
     with open(STATE_FILE, "w") as f:
         json.dump({"last_index": idx}, f)
 
-def load_and_parse_logs():
-    with open(LOG_FILE) as f:
-        lines = f.readlines()
-    return [parse_log_line(line) for line in lines if parse_log_line(line)]
+# def load_and_parse_logs():
+#     with open(LOG_FILE) as f:
+#         lines = f.readlines()
+#     return [parse_log_line(line) for line in lines if parse_log_line(line)]
 
-all_logs = load_and_parse_logs()
+# all_logs = load_and_parse_logs()
+
+def load_logs():
+    if Path(LOG_FILE).exists():
+        with open(LOG_FILE) as f:
+            return f.readlines()
+    return []
 
 @app.get("/logs")
 def get_logs():
+    lines = load_logs()
     start = get_last_index()
     end = start + BATCH_SIZE
-    batch = all_logs[start:end]
-    update_last_index(min(end, len(all_logs)))
+    batch = lines[start:end]
+    update_last_index(min(end, len(lines)))
+
     return {
-        "logs": batch,
-        "has_more": end < len(all_logs)
+        "raw_logs": [line.strip() for line in batch],
+        "start_index": start,
+        "end_index": min(end, len(lines)),
+        "total_logs": len(lines)
     }
